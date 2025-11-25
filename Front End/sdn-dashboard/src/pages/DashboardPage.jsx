@@ -1,10 +1,10 @@
 // src/pages/DashboardPage.js
 import React, { useCallback } from "react";
-import Layout from "../components/Layout";
-import TopologyGraph from "../components/TopologyGraph";
-import ControlsBar from "../components/ControlsBar";
-import { useTopologyPolling } from "../hooks/useTopologyPolling";
-import { resetSimulation } from "../api/topologyApi";
+import Layout from "../components/Layout.jsx";
+import TopologyGraph from "../components/TopologyGraph.jsx";
+import ControlsBar from "../components/ControlsBar.jsx";
+import { useTopologyPolling } from "../hooks/useTopologyPolling.js";
+import { resetSimulation } from "../api/topologyApi.js";
 
 const DashboardPage = () => {
   const { graphData, entryCount, loading, error } = useTopologyPolling(1000);
