@@ -1,8 +1,30 @@
-// src/components/TopologyGraph.js
-import React from "react";
+import React, { useMemo } from "react";
 import ForceGraph2D from "react-force-graph-2d";
 
 const TopologyGraph = ({ graphData }) => {
+  // Build a STATIC layout: put nodes on a circle and fix them with fx / fy
+  const laidOutData = useMemo(() => {
+    if (!graphData) return { nodes: [], links: [] };
+
+    const nodes = graphData.nodes || [];
+    const links = graphData.links || [];
+    const N = nodes.length;
+    const radius = 150; // spread of the circle
+
+    const laidOutNodes = nodes.map((node, i) => {
+      if (N === 0) return node;
+      const angle = (2 * Math.PI * i) / N;
+      return {
+        ...node,
+        // fixed positions – d3 will not move them
+        fx: radius * Math.cos(angle),
+        fy: radius * Math.sin(angle),
+      };
+    });
+
+    return { nodes: laidOutNodes, links };
+  }, [graphData]);
+
   return (
     <div
       style={{
@@ -14,20 +36,16 @@ const TopologyGraph = ({ graphData }) => {
       }}
     >
       <ForceGraph2D
-        graphData={graphData}
+        graphData={laidOutData}
         backgroundColor="#020617"
         nodeLabel={(node) => node.name}
-        linkDirectionalArrowLength={6}
-        linkDirectionalArrowRelPos={1}
-        linkWidth={(link) => 1 + (link.hopCount || 1) * 0.2}
-        linkLabel={(link) =>
-          `self → nextHop
-self: ${link.source?.id ?? link.source}
-nextHop: ${link.target?.id ?? link.target}
-for dest: ${link.destId}
-hops: ${link.hopCount}
-seq: ${link.destSeqNum}`
-        }
+        linkWidth={() => 2.5}
+        linkColor={() => "rgba(255,255,255,0.8)"}
+        linkDirectionalArrowLength={8}
+        linkDirectionalArrowRelPos={0.9}
+        // IMPORTANT: no simulation, no movement
+        cooldownTicks={0}
+        enableNodeDrag={false}
         nodeCanvasObject={(node, ctx, globalScale) => {
           const label = node.name;
           const fontSize = 12 / globalScale;
