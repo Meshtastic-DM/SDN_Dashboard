@@ -41,7 +41,7 @@ const TopologyGraph = ({ graphData }) => {
         nodeLabel={(node) => node.name}
         linkWidth={() => 2.5}
         linkColor={() => "rgba(255,255,255,0.8)"}
-        linkDirectionalArrowLength={8}
+        linkDirectionalArrowLength={4}
         linkDirectionalArrowRelPos={0.9}
         // IMPORTANT: no simulation, no movement
         cooldownTicks={0}

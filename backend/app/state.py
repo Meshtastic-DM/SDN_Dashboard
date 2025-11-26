@@ -1,4 +1,3 @@
-# app/state.py
 from typing import List, Dict, Any
 
 VISIBLE_ENTRIES: List[Dict[str, Any]] = []
@@ -18,35 +17,57 @@ def get_visible_entries() -> List[Dict[str, Any]]:
 
 
 def build_graph(entries: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Build topology graph from routing entries.
+
+    Rules:
+    - Skip malformed / blank entries ({} etc.).
+    - Links are ONLY selfId -> nextHop.
+    - Nodes are ONLY those that appear as source or target of some link.
+      => no node can exist without at least one edge.
+    """
     node_map: Dict[int, Dict[str, Any]] = {}
     links: List[Dict[str, Any]] = []
 
     for r in entries:
-        if not r.get("valid", True):
+        if not isinstance(r, dict):
             continue
 
-        self_id = int(r["selfId"])
-        next_hop = int(r["nextHop"])
-        dest_id = int(r["destId"])
+        self_id = r.get("selfId")
+        next_hop = r.get("nextHop")
+        dest_id = r.get("destId")
 
-        # nodes for self, nextHop, dest
-        for nid in (self_id, next_hop, dest_id):
+        # must have core fields
+        if self_id is None or next_hop is None or dest_id is None:
+            continue
+
+        try:
+            self_id = int(self_id)
+            next_hop = int(next_hop)
+            dest_id = int(dest_id)
+        except (TypeError, ValueError):
+            continue
+
+        hop_count = r.get("hopCount", 1)
+        dest_seq_num = r.get("destSeqNum", 0)
+
+        # ONLY self and nextHop create nodes (not dest-only nodes)
+        for nid in (self_id, next_hop):
             if nid not in node_map:
                 node_map[nid] = {
                     "id": nid,
                     "name": f"Node {nid}",
                 }
 
-        # link self → nextHop
         links.append({
             "source": self_id,
             "target": next_hop,
-            "hopCount": int(r.get("hopCount", 1)),
+            "hopCount": int(hop_count) if hop_count is not None else 1,
             "destId": dest_id,
-            "destSeqNum": int(r.get("destSeqNum", 0)),
+            "destSeqNum": int(dest_seq_num) if dest_seq_num is not None else 0,
         })
 
-    # dedupe by (source, target, destId)
+    # dedupe links by (source, target, destId)
     seen = set()
     unique_links: List[Dict[str, Any]] = []
     for l in links:
@@ -56,8 +77,15 @@ def build_graph(entries: List[Dict[str, Any]]) -> Dict[str, Any]:
         seen.add(key)
         unique_links.append(l)
 
+    # KEEP ONLY NODES THAT ARE IN SOME LINK (source or target)
+    linked_nodes = set()
+    for l in unique_links:
+        linked_nodes.add(l["source"])
+        linked_nodes.add(l["target"])
+
+    filtered_nodes = [n for n in node_map.values() if n["id"] in linked_nodes]
+
     return {
-        "nodes": list(node_map.values()),
+        "nodes": filtered_nodes,
         "links": unique_links,
     }
-
