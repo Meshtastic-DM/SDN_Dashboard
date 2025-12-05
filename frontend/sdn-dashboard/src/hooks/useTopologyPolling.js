@@ -1,4 +1,3 @@
-// src/hooks/useTopologyPolling.js
 import { useEffect, useState, useRef } from "react";
 import { fetchTopology, fetchEntries } from "../api/topologyApi";
 
@@ -18,23 +17,31 @@ export function useTopologyPolling(pollIntervalMs = 1000) {
           fetchTopology(),
           fetchEntries(),
         ]);
+
         if (cancelled) return;
-        setGraphData(topology);
+
+        // Only update if topology actually changed
+        setGraphData((prev) => {
+          const prevStr = JSON.stringify(prev);
+          const newStr = JSON.stringify(topology);
+          if (prevStr === newStr) {
+            return prev; // no change → no re-render
+          }
+          return topology;
+        });
+
         setEntryCount(entries.count);
         setError(null);
         setLoading(false);
       } catch (err) {
-        console.error(err);
         if (cancelled) return;
+        console.error(err);
         setError(err);
         setLoading(false);
       }
     };
 
-    // initial fetch
     fetchAll();
-
-    // start polling
     intervalRef.current = setInterval(fetchAll, pollIntervalMs);
 
     return () => {
