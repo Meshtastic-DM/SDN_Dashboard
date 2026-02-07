@@ -1,0 +1,28 @@
+/* src/components/TopologyGraph.css */
+.topology-container {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.topology-container canvas {
+  max-width: 100% !important;
+  max-height: 100% !important;
+}
+
+.view-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+  font-size: 24px;
+  font-weight: 500;
+  color: #666;
+}

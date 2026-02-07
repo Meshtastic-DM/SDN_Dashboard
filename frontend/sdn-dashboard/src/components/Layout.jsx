@@ -1,18 +1,10 @@
-// src/components/Layout.js
+// src/components/Layout.jsx
 import React from "react";
+import './Layout.css';
 
 const Layout = ({ children }) => {
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#030712",
-        color: "#e5e7eb",
-        padding: "16px",
-        fontFamily:
-          "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-      }}
-    >
+    <div className="layout">
       {children}
     </div>
   );
