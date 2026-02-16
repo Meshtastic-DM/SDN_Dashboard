@@ -1,6 +1,7 @@
 # app/main.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from typing import List, Optional
 
 from .state import (
   get_visible_entries,
@@ -8,6 +9,7 @@ from .state import (
   reset_state,
 )
 from .feed_simulator import start_simulated_feed
+from .meshtastic_service import fetch_all_nodes, format_node_for_display
 
 app = FastAPI()
 
@@ -50,3 +52,50 @@ async def reset_simulation():
   reset_state()
   await start_simulated_feed()
   return {"status": "reset"}
+
+
+@app.get("/api/meshtastic/nodes")
+def get_meshtastic_nodes(ports: Optional[str] = None):
+  """
+  Fetch Meshtastic node information from specified ports.
+  
+  Args:
+      ports: Comma-separated list of ports (e.g., "4403,4404,4405")
+            If not provided, defaults to [4403, 4404, 4405, 4406, 4407]
+  
+  Returns:
+      List of formatted node data from each port
+  """
+  if ports:
+    port_list = [int(p.strip()) for p in ports.split(",")]
+  else:
+    port_list = [4403, 4404, 4405, 4406, 4407]
+  
+  nodes_data = fetch_all_nodes(port_list)
+  formatted_nodes = [format_node_for_display(node) for node in nodes_data]
+  
+  return {
+    "count": len(formatted_nodes),
+    "nodes": formatted_nodes
+  }
+
+
+@app.get("/api/meshtastic/node/{port}")
+def get_meshtastic_node(port: int):
+  """
+  Fetch Meshtastic node information from a specific port.
+  
+  Args:
+      port: TCP port number
+  
+  Returns:
+      Formatted node data
+  """
+  from .meshtastic_service import fetch_meshtastic_info
+  
+  node_data = fetch_meshtastic_info(port=port)
+  if node_data:
+    node_data["port"] = port
+    return format_node_for_display(node_data)
+  
+  return {"error": f"Failed to fetch data from port {port}"}
