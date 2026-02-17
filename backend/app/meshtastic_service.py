@@ -6,6 +6,65 @@ import re
 from typing import Dict, Any, List, Optional
 
 
+def discover_meshtastic_ports(min_port: int = 4403, use_wsl: bool = True) -> List[int]:
+    """
+    Discover active Meshtastic node ports using 'ss' command.
+    This is much faster than port scanning.
+    
+    Args:
+        min_port: Minimum port number to consider (default: 4403)
+        use_wsl: If True, runs command through WSL (for Windows hosts)
+    
+    Returns:
+        List of active Meshtastic port numbers
+    """
+    try:
+        # Run ss command to list all TCP listening ports
+        if use_wsl:
+            # For Windows, run through WSL
+            cmd = "wsl ss -tulnp"
+        else:
+            # For Linux/native
+            cmd = "ss -tulnp"
+        
+        result = subprocess.run(
+            cmd,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        
+        if result.returncode != 0:
+            print(f"Error running ss command: {result.stderr}")
+            return []
+        
+        # Parse ss output to find Meshtastic ports
+        ports = []
+        lines = result.stdout.split('\n')
+        
+        for line in lines:
+            # Look for TCP LISTEN lines with "program" process name
+            if 'LISTEN' in line and 'program' in line:
+                # Extract port number from "0.0.0.0:4403" or similar
+                match = re.search(r':(\d+)\s+0\.0\.0\.0:\*', line)
+                if match:
+                    port = int(match.group(1))
+                    if port >= min_port:
+                        ports.append(port)
+        
+        ports.sort()
+        print(f"Discovered {len(ports)} Meshtastic node(s) on ports: {ports}")
+        return ports
+        
+    except subprocess.TimeoutExpired:
+        print("Timeout running ss command")
+        return []
+    except Exception as e:
+        print(f"Exception discovering ports: {e}")
+        return []
+
+
 def fetch_meshtastic_info(host: str = "127.0.0.1", port: int = 4403) -> Optional[Dict[str, Any]]:
     """
     Fetch Meshtastic node information via CLI.
@@ -141,23 +200,50 @@ def safe_parse_json(json_str: str) -> Dict[str, Any]:
         return {}
 
 
-def fetch_all_nodes(node_ports: List[int] = [4403, 4404, 4405, 4406, 4407]) -> List[Dict[str, Any]]:
+def fetch_all_nodes(node_ports: Optional[List[int]] = None, 
+                    auto_discover: bool = True,
+                    min_port: int = 4403,
+                    use_wsl: bool = True) -> List[Dict[str, Any]]:
     """
     Fetch information from multiple Meshtastic nodes.
     
     Args:
-        node_ports: List of TCP ports to query
+        node_ports: Optional list of specific TCP ports to query.
+                   If None and auto_discover=True, will use 'ss' to find active ports.
+        auto_discover: If True, automatically discover ports using 'ss' command
+        min_port: Minimum port number to consider (default: 4403)
+        use_wsl: If True, runs discovery through WSL (for Windows hosts)
     
     Returns:
         List of node information dictionaries
     """
     all_nodes = []
     
-    for port in node_ports:
+    # Determine which ports to query
+    if node_ports is None and auto_discover:
+        # Auto-discover using ss command
+        ports_to_query = discover_meshtastic_ports(min_port=min_port, use_wsl=use_wsl)
+    elif node_ports:
+        # Use provided ports
+        ports_to_query = node_ports
+    else:
+        # No ports specified and auto_discover is False
+        print("No ports specified and auto_discover=False. Returning empty list.")
+        return []
+    
+    if not ports_to_query:
+        print("No active Meshtastic ports found.")
+        return []
+    
+    print(f"Fetching data from {len(ports_to_query)} node(s)...")
+    
+    for port in ports_to_query:
         node_data = fetch_meshtastic_info(port=port)
         if node_data:
             node_data["port"] = port
             all_nodes.append(node_data)
+        else:
+            print(f"Warning: Port {port} is listening but didn't return valid Meshtastic data")
     
     return all_nodes
 
