@@ -27,7 +27,7 @@ const ExtendedNodeView = () => {
   };
 
   useEffect(() => {
-    // fetchNodes();
+    fetchNodes();
     // Auto-refresh every 30 seconds
     // const interval = setInterval(fetchNodes, 30000);
     // return () => clearInterval(interval);
