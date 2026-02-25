@@ -13,14 +13,14 @@ const Sidebar = ({ activeView, onViewChange }) => {
     { id: 'placeholder2', label: '' },
     { id: 'placeholder3', label: '' },
     { id: 'placeholder4', label: '' },
-    { id: 'placeholder1', label: '' },
-    { id: 'placeholder2', label: '' },
-    { id: 'placeholder3', label: '' },
-    { id: 'placeholder4', label: '' },
-    { id: 'placeholder1', label: '' },
-    { id: 'placeholder2', label: '' },
-    { id: 'placeholder3', label: '' },
-    { id: 'placeholder4', label: '' },
+    { id: 'placeholder5', label: '' },
+    { id: 'placeholder6', label: '' },
+    { id: 'placeholder7', label: '' },
+    { id: 'placeholder8', label: '' },
+    { id: 'placeholder9', label: '' },
+    { id: 'placeholder10', label: '' },
+    { id: 'placeholder11', label: '' },
+    { id: 'placeholder12', label: '' },
   ];
 
   return (

@@ -5,13 +5,14 @@ import Header from "../components/Header.jsx";
 import Sidebar from "../components/Sidebar.jsx";
 import TopologyGraph from "../components/TopologyGraph.jsx";
 import OfflineMapView from "../components/OfflineMapView.jsx";
+import ExtendedNodeView from "../components/ExtendedNodeView.jsx";
 import ControlsBar from "../components/ControlsBar.jsx";
 import { useTopologyPolling } from "../hooks/useTopologyPolling.js";
 // import { resetSimulation } from "../api/topologyApi.js";
 
 const DashboardPage = () => {
   const [activeView, setActiveView] = useState('offline-map');
-  const { graphData} = useTopologyPolling(1000);
+  const { graphData} = useTopologyPolling(5000);
 
   // const handleReset = useCallback(async () => {
   //   try {
@@ -28,7 +29,7 @@ const DashboardPage = () => {
       case 'topology':
         return <TopologyGraph graphData={graphData} />;
       case 'extended-node':
-        return <div className="view-placeholder">Extended Node View - Coming Soon</div>;
+        return <ExtendedNodeView />;
       case 'messaging':
         return <div className="view-placeholder">Messaging - Coming Soon</div>;
       case 'route-analysis':
