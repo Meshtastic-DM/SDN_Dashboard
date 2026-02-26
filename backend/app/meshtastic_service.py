@@ -65,40 +65,68 @@ def discover_meshtastic_ports(min_port: int = 4403, use_wsl: bool = True) -> Lis
         return []
 
 
-def fetch_meshtastic_info(host: str = "127.0.0.1", port: int = 4403) -> Optional[Dict[str, Any]]:
+def fetch_meshtastic_info(host: str = "127.0.0.1", port: int = 4403, retries: int = 2, timeout: int = 8) -> Optional[Dict[str, Any]]:
     """
-    Fetch Meshtastic node information via CLI.
+    Fetch Meshtastic node information via CLI with retry logic.
     
     Args:
         host: TCP host address
         port: TCP port number
+        retries: Number of retry attempts on failure (default: 2)
+        timeout: Command timeout in seconds (default: 8)
     
     Returns:
         Parsed node information dictionary or None if failed
     """
-    try:
-        # Run meshtastic CLI command
-        cmd = f"meshtastic --tcp {host}:{port} --info"
-        result = subprocess.run(
-            cmd,
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=10
-        )
-        
-        if result.returncode != 0:
-            print(f"Error fetching from {host}:{port}: {result.stderr}")
-            return None
-            
-        return parse_meshtastic_output(result.stdout)
+    last_error = None
     
-    except subprocess.TimeoutExpired:
-        print(f"Timeout connecting to {host}:{port}")
-        return None
-    except Exception as e:
-        print(f"Exception fetching Meshtastic data: {e}")
-        return None
+    for attempt in range(retries + 1):
+        try:
+            # Run meshtastic CLI command with shorter timeout to fail fast
+            cmd = f"meshtastic --tcp {host}:{port} --info"
+            result = subprocess.run(
+                cmd,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=timeout
+            )
+            
+            if result.returncode != 0:
+                error_msg = result.stderr.strip()
+                # Check for connection-related errors
+                if "Broken pipe" in error_msg or "Connection refused" in error_msg or "timed out" in error_msg:
+                    last_error = f"Connection issue on {host}:{port}: {error_msg[:100]}"
+                    if attempt < retries:
+                        print(f"Attempt {attempt + 1}/{retries + 1} failed for {host}:{port}, retrying...")
+                        continue
+                else:
+                    print(f"Error fetching from {host}:{port}: {error_msg}")
+                    return None
+            else:
+                # Success - parse and return
+                return parse_meshtastic_output(result.stdout)
+        
+        except subprocess.TimeoutExpired:
+            last_error = f"Timeout connecting to {host}:{port}"
+            if attempt < retries:
+                print(f"Attempt {attempt + 1}/{retries + 1} timed out for {host}:{port}, retrying...")
+                continue
+        except BrokenPipeError:
+            last_error = f"Broken pipe error connecting to {host}:{port}"
+            if attempt < retries:
+                print(f"Attempt {attempt + 1}/{retries + 1} broken pipe for {host}:{port}, retrying...")
+                continue
+        except Exception as e:
+            last_error = f"Exception fetching Meshtastic data from {host}:{port}: {e}"
+            if attempt < retries:
+                print(f"Attempt {attempt + 1}/{retries + 1} failed with exception, retrying...")
+                continue
+    
+    # All retries exhausted
+    if last_error:
+        print(f"Failed after {retries + 1} attempts: {last_error}")
+    return None
 
 
 def parse_meshtastic_output(output: str) -> Dict[str, Any]:
@@ -203,7 +231,9 @@ def safe_parse_json(json_str: str) -> Dict[str, Any]:
 def fetch_all_nodes(node_ports: Optional[List[int]] = None, 
                     auto_discover: bool = True,
                     min_port: int = 4403,
-                    use_wsl: bool = True) -> List[Dict[str, Any]]:
+                    use_wsl: bool = True,
+                    timeout: int = 8,
+                    retries: int = 2) -> List[Dict[str, Any]]:
     """
     Fetch information from multiple Meshtastic nodes.
     
@@ -213,6 +243,8 @@ def fetch_all_nodes(node_ports: Optional[List[int]] = None,
         auto_discover: If True, automatically discover ports using 'ss' command
         min_port: Minimum port number to consider (default: 4403)
         use_wsl: If True, runs discovery through WSL (for Windows hosts)
+        timeout: Timeout per node query in seconds (default: 8)
+        retries: Number of retry attempts per node (default: 2)
     
     Returns:
         List of node information dictionaries
@@ -237,14 +269,20 @@ def fetch_all_nodes(node_ports: Optional[List[int]] = None,
     
     print(f"Fetching data from {len(ports_to_query)} node(s)...")
     
+    successful_queries = 0
+    failed_queries = 0
+    
     for port in ports_to_query:
-        node_data = fetch_meshtastic_info(port=port)
+        node_data = fetch_meshtastic_info(port=port, timeout=timeout, retries=retries)
         if node_data:
             node_data["port"] = port
             all_nodes.append(node_data)
+            successful_queries += 1
         else:
-            print(f"Warning: Port {port} is listening but didn't return valid Meshtastic data")
+            failed_queries += 1
+            print(f"Warning: Port {port} is listening but connection failed or returned invalid data")
     
+    print(f"Query complete: {successful_queries} successful, {failed_queries} failed")
     return all_nodes
 
 
