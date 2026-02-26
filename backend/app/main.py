@@ -2,14 +2,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
+from .routers import topology, meshtastic
 
-from .state import (
+from .startup_functions.state import (
   get_visible_entries,
   build_graph,
   reset_state,
 )
-from .feed_simulator import start_simulated_feed
-from .meshtastic_service import (
+from .startup_functions.feed_simulator import start_simulated_feed
+from .services.meshtastic_service import (
     fetch_all_nodes, 
     format_node_for_display, 
     discover_meshtastic_ports
@@ -25,6 +26,9 @@ app.add_middleware(
   allow_headers=["*"],
 )
 
+# Include routers
+app.include_router(topology.router)
+app.include_router(meshtastic.router)
 
 @app.on_event("startup")
 async def startup_event():
@@ -33,114 +37,89 @@ async def startup_event():
   await start_simulated_feed()
 
 
-@app.get("/api/topology")
-def get_topology():
-  """Current topology based on entries received so far."""
-  entries = get_visible_entries()
-  return build_graph(entries)
+# @app.get("/api/meshtastic/nodes")
+# def get_meshtastic_nodes(
+#     ports: Optional[str] = None,
+#     min_port: int = 4403,
+#     use_wsl: bool = True
+# ):
+#   """
+#   Fetch Meshtastic node information with automatic discovery using 'ss' command.
+  
+#   Args:
+#       ports: Optional comma-separated list of specific ports (e.g., "4403,4404,4405")
+#              If provided, auto-discovery is skipped.
+#       min_port: Minimum port number to consider for discovery (default: 4403)
+#       use_wsl: Use WSL for port discovery on Windows (default: True)
+  
+#   Returns:
+#       List of formatted node data from discovered or specified ports
+  
+#   Examples:
+#       /api/meshtastic/nodes - Auto-discover using 'ss' command
+#       /api/meshtastic/nodes?ports=4403,4404 - Query specific ports only
+#       /api/meshtastic/nodes?min_port=5000 - Discover nodes on ports >= 5000
+#   """
+#   if ports:
+#     # Use specific ports provided (manual mode)
+#     port_list = [int(p.strip()) for p in ports.split(",")]
+#     nodes_data = fetch_all_nodes(node_ports=port_list, auto_discover=False)
+#     discovery_mode = "manual"
+#   else:
+#     # Auto-discover using ss command
+#     nodes_data = fetch_all_nodes(
+#       auto_discover=True,
+#       min_port=min_port,
+#       use_wsl=use_wsl
+#     )
+#     discovery_mode = "auto"
+  
+#   formatted_nodes = [format_node_for_display(node) for node in nodes_data]
+  
+#   return {
+#     "count": len(formatted_nodes),
+#     "nodes": formatted_nodes,
+#     "discoveryMode": discovery_mode
+#   }
 
 
-@app.get("/api/entries")
-def api_get_entries():
-  """Raw routing entries (for debugging)."""
-  entries = get_visible_entries()
-  return {
-    "count": len(entries),
-    "entries": entries,
-  }
+# @app.get("/api/meshtastic/discover")
+# def discover_ports(min_port: int = 4403, use_wsl: bool = True):
+#   """
+#   Discover active Meshtastic node ports using 'ss' command (fast, no data fetch).
+  
+#   Args:
+#       min_port: Minimum port number to consider (default: 4403)
+#       use_wsl: Use WSL for discovery on Windows (default: True)
+  
+#   Returns:
+#       List of active Meshtastic port numbers
+#   """
+#   active_ports = discover_meshtastic_ports(min_port=min_port, use_wsl=use_wsl)
+  
+#   return {
+#     "activePorts": active_ports,
+#     "count": len(active_ports),
+#     "method": "ss command"
+#   }
 
 
-@app.post("/api/reset")
-async def reset_simulation():
-  """Reset and restart simulator."""
-  reset_state()
-  await start_simulated_feed()
-  return {"status": "reset"}
-
-
-@app.get("/api/meshtastic/nodes")
-def get_meshtastic_nodes(
-    ports: Optional[str] = None,
-    min_port: int = 4403,
-    use_wsl: bool = True
-):
-  """
-  Fetch Meshtastic node information with automatic discovery using 'ss' command.
+# @app.get("/api/meshtastic/node/{port}")
+# def get_meshtastic_node(port: int):
+#   """
+#   Fetch Meshtastic node information from a specific port.
   
-  Args:
-      ports: Optional comma-separated list of specific ports (e.g., "4403,4404,4405")
-             If provided, auto-discovery is skipped.
-      min_port: Minimum port number to consider for discovery (default: 4403)
-      use_wsl: Use WSL for port discovery on Windows (default: True)
+#   Args:
+#       port: TCP port number
   
-  Returns:
-      List of formatted node data from discovered or specified ports
+#   Returns:
+#       Formatted node data
+#   """
+#   from .meshtastic_service import fetch_meshtastic_info
   
-  Examples:
-      /api/meshtastic/nodes - Auto-discover using 'ss' command
-      /api/meshtastic/nodes?ports=4403,4404 - Query specific ports only
-      /api/meshtastic/nodes?min_port=5000 - Discover nodes on ports >= 5000
-  """
-  if ports:
-    # Use specific ports provided (manual mode)
-    port_list = [int(p.strip()) for p in ports.split(",")]
-    nodes_data = fetch_all_nodes(node_ports=port_list, auto_discover=False)
-    discovery_mode = "manual"
-  else:
-    # Auto-discover using ss command
-    nodes_data = fetch_all_nodes(
-      auto_discover=True,
-      min_port=min_port,
-      use_wsl=use_wsl
-    )
-    discovery_mode = "auto"
+#   node_data = fetch_meshtastic_info(port=port)
+#   if node_data:
+#     node_data["port"] = port
+#     return format_node_for_display(node_data)
   
-  formatted_nodes = [format_node_for_display(node) for node in nodes_data]
-  
-  return {
-    "count": len(formatted_nodes),
-    "nodes": formatted_nodes,
-    "discoveryMode": discovery_mode
-  }
-
-
-@app.get("/api/meshtastic/discover")
-def discover_ports(min_port: int = 4403, use_wsl: bool = True):
-  """
-  Discover active Meshtastic node ports using 'ss' command (fast, no data fetch).
-  
-  Args:
-      min_port: Minimum port number to consider (default: 4403)
-      use_wsl: Use WSL for discovery on Windows (default: True)
-  
-  Returns:
-      List of active Meshtastic port numbers
-  """
-  active_ports = discover_meshtastic_ports(min_port=min_port, use_wsl=use_wsl)
-  
-  return {
-    "activePorts": active_ports,
-    "count": len(active_ports),
-    "method": "ss command"
-  }
-
-
-@app.get("/api/meshtastic/node/{port}")
-def get_meshtastic_node(port: int):
-  """
-  Fetch Meshtastic node information from a specific port.
-  
-  Args:
-      port: TCP port number
-  
-  Returns:
-      Formatted node data
-  """
-  from .meshtastic_service import fetch_meshtastic_info
-  
-  node_data = fetch_meshtastic_info(port=port)
-  if node_data:
-    node_data["port"] = port
-    return format_node_for_display(node_data)
-  
-  return {"error": f"Failed to fetch data from port {port}"}
+#   return {"error": f"Failed to fetch data from port {port}"}
