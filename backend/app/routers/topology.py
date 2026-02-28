@@ -28,7 +28,7 @@ async def reset_simulation():
     return {"status": "reset"}
 
 
-"This api is used to load all routes from the database on initial page load."
+#"This api is used to load all routes from the database on initial page load."
 @router.get("/loadall/routes")
 def load_all_routes():
     db = SessionLocal()
@@ -39,7 +39,7 @@ def load_all_routes():
     finally:
         db.close()
 
-"This websocket endpoint is used to push real-time route updates to the frontend."
+#"This websocket endpoint is used to push real-time route updates to the frontend."
 @router.websocket("/ws/routes")
 async def ws_readings(ws: WebSocket):
     await ws.accept()

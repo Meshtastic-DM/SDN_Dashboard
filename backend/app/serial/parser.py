@@ -7,6 +7,11 @@ def parse_line(line: str):
         "The serial output of a route update should look like this:"
         "[SDN_ROUTE_UPDATE] seq_no=123 reporting_node=NodeA destination=NodeB next_hop=NodeC expiring_time=2024-06-01T12:00:00Z"
         "No spaces between = and the value, but spaces between different key=value pairs. @Raveen" 
+        seq_no = None
+        reporting_node = None
+        destination = None
+        next_hop = None
+        expiring_time = None
         for part in parts[1:]:
             if "=" in part:
                 key, value = part.split("=", 1)
