@@ -1,5 +1,6 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, FastAPI, Request
 from typing import List, Optional
+from app.serial.meshtastic_client import get_meshtastic_port, start_meshtastic_client
 from ..services.meshtastic_service import fetch_all_nodes, format_node_for_display, discover_meshtastic_ports
 router = APIRouter(prefix="/api/meshtastic", tags=["meshtastic"])
 
@@ -87,3 +88,23 @@ def get_meshtastic_node(port: int):
     return format_node_for_display(node_data)
   
   return {"error": f"Failed to fetch data from port {port}"}
+
+############################################################################
+# These are endpoints related to starting/stopping the Meshtastic client
+############################################################################
+
+def get_app(request: Request):
+    return request.app
+
+@router.get("/comports")
+def get_comports():
+    ports = get_meshtastic_port()
+    return {"comports": ports, "count": len(ports)}
+
+@router.post("/start-client")
+def start_client(devPath: Optional[str] = None, app: FastAPI = Depends(get_app)):
+    try:
+        start_meshtastic_client(app, devPath=devPath)
+        return {"status": "Meshtastic client started successfully"}
+    except ValueError as e:
+        return {"status": "error", "message": str(e)}

@@ -41,8 +41,6 @@ def get_meshtastic_port():
 
 def start_meshtastic_client(app, devPath=None):
     """Function to start the Meshtastic client and listen for packets"""
-    app.state.text_message_broadcaster.set_loop(asyncio.get_running_loop())
-    
     # If no port specified, try to detect it
     if not devPath:
         ports = get_meshtastic_port()
@@ -67,6 +65,8 @@ def start_meshtastic_client(app, devPath=None):
         # Catch sys.exit() calls from Meshtastic library
         print(f"⚠️  Meshtastic client failed to start (SystemExit: {e})")
         print(f"   Check that {devPath} is the correct port and device is connected.")
+        raise ValueError(f"Meshtastic client failed to start: {e}")
     except Exception as e:
         print(f"⚠️  Error starting Meshtastic client: {e}")
         print(f"   Application will continue without Meshtastic integration.")
+        raise ValueError(f"Meshtastic client failed to start: {e}")
