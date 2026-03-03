@@ -2,6 +2,7 @@ import meshtastic
 import meshtastic.serial_interface
 from pubsub import pub
 from app.services.texting_service import publish_text_to_websocket
+from app.services.node_service import update_nodes_db
 import asyncio
 
 def on_receive(packet, interface):
@@ -38,3 +39,4 @@ def start_meshtastic_client(app,port = None,baudrate = None):
     interface.app = app  # Attach app reference for WebSocket publishing
     pub.subscribe(on_receive, "meshtastic.receive")
     print("Meshtastic client started and listening for packets...")
+    update_nodes_db(interface)  # Initial fetch of nodes to populate database

@@ -20,7 +20,7 @@ class Broadcaster:
         if not self.loop:
             return
         # schedule async sends from a thread
-        print(f"[DEBUG]Scheduling broadcast to {len(self.clients)} clients: {payload}")
+        #print(f"[DEBUG]Scheduling broadcast to {len(self.clients)} clients: {payload}")
         asyncio.run_coroutine_threadsafe(self._broadcast(payload), self.loop)
 
     async def _broadcast(self, payload: dict):
