@@ -1,3 +1,4 @@
+#TODO: This need to be deleted when the Meshtastic client is fully integrated and tested, as the client will handle parsing internally and emit structured events instead of raw lines. @Tharoosha
 import time
 import serial
 
