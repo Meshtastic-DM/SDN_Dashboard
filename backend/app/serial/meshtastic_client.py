@@ -1,11 +1,17 @@
 import meshtastic
 import meshtastic.serial_interface
 from pubsub import pub
-from app.services.texting_service import publish_text_to_websocket
 from app.services.node_service import update_nodes_db
 import asyncio
 import os
 import serial.tools.list_ports
+
+def publish_text_to_websocket(app, message:dict):
+    """Utility function to publish text message updates to the frontend via WebSocket"""
+    broadcaster = app.state.text_message_broadcaster  # Use separate broadcaster for texts
+    broadcaster.publish(message)
+    print(f"Published text message to WebSocket: {message}")
+
 
 def on_receive(packet, interface):
     """Callback function to handle incoming Meshtastic packets"""
@@ -15,8 +21,8 @@ def on_receive(packet, interface):
         return  # Ignore packets that can't be decoded
     decoded = packet["decoded"]
     if decoded.get("portnum") == "TEXT_MESSAGE_APP":
-        source = packet.get("from")
-        destination = packet.get("to")
+        source = hex(packet.get("from"))
+        destination = hex(packet.get("to"))
         text = decoded.get("text"),
         rssi = packet.get("rxRssi")
         # Create a message dict to send to the frontend
@@ -57,6 +63,7 @@ def start_meshtastic_client(app, devPath=None):
         else:
             interface = meshtastic.serial_interface.SerialInterface()
         
+        app.state.meshtastic_interface = interface  # Store interface in app state for access in callbacks
         interface.app = app  # Attach app reference for WebSocket publishing
         pub.subscribe(on_receive, "meshtastic.receive")
         print(f"✓ Meshtastic client started on {devPath} and listening for packets...")
@@ -70,3 +77,15 @@ def start_meshtastic_client(app, devPath=None):
         print(f"⚠️  Error starting Meshtastic client: {e}")
         print(f"   Application will continue without Meshtastic integration.")
         raise ValueError(f"Meshtastic client failed to start: {e}")
+    
+def send_text_message_client(interface, destination, text):
+    """Function to send a text message via the Meshtastic interface"""
+    if not interface:
+        print("⚠️  Cannot send message: Meshtastic interface not initialized.")
+        return
+    try:
+        interface.sendText(text, destinationId=destination)
+        print(f"✓ Sent message to {destination}: {text}")
+    except Exception as e:
+        print(f"⚠️  Error sending message: {e}")
+        raise ValueError(f"Failed to send text message: {e}")
