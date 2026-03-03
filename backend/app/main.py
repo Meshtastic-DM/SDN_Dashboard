@@ -53,12 +53,12 @@ async def startup_event():
   # store event loop reference for thread -> websocket
   app.state.broadcaster.set_loop(asyncio.get_running_loop())
   #line_iter = iter_serial_lines(port="COM3", baud=9600)  # Update with your serial port and baudrate
-  line_iter = iter_fake_lines()
-  global worker
-  worker = SerialWorker(line_iter, app.state.broadcaster)
-  worker.start()
+  # line_iter = iter_fake_lines()
+  # global worker
+  # worker = SerialWorker(line_iter, app.state.broadcaster)
+  # worker.start()
 
-  # Start Meshtastic client
+  # Start Meshtastic client (handles its own errors gracefully)
   start_meshtastic_client(app)
 
 @app.on_event("shutdown")
