@@ -4,14 +4,14 @@ import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
-from app.routers import topology, meshtastic
+from app.routers import topology, meshtastic,texting
 
-from app.startup_functions.state import (
+from app.services.startup_functions.state import (
   get_visible_entries,
   build_graph,
   reset_state,
 )
-from app.startup_functions.feed_simulator import start_simulated_feed
+from app.services.startup_functions.feed_simulator import start_simulated_feed
 from app.services.meshtastic_service import (
     fetch_all_nodes, 
     format_node_for_display, 
@@ -21,11 +21,13 @@ from app.services.meshtastic_service import (
 from app.services.broadcaster import Broadcaster
 from app.serial.worker import SerialWorker
 from app.serial.serial_source import iter_fake_lines, iter_serial_lines
+from app.serial.meshtastic_client import start_meshtastic_client
 
 app = FastAPI()
 
 # Store broadcaster in app.state for access across routers
 app.state.broadcaster = Broadcaster()
+app.state.text_message_broadcaster = Broadcaster()  # Separate broadcaster for DM updates if needed
 worker = None
 
 app.add_middleware(
@@ -39,6 +41,7 @@ app.add_middleware(
 # Include routers
 app.include_router(topology.router)
 app.include_router(meshtastic.router)
+app.include_router(texting.router)
 
 @app.on_event("startup")
 async def startup_event():
@@ -54,6 +57,9 @@ async def startup_event():
   global worker
   worker = SerialWorker(line_iter, app.state.broadcaster)
   worker.start()
+
+  # Start Meshtastic client
+  start_meshtastic_client(app)
 
 @app.on_event("shutdown")
 def shutdown_event():
