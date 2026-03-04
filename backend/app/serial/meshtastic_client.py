@@ -56,7 +56,8 @@ def on_receive(packet, interface):
             "rssi": rssi,
             "id": id,
             "channel": channel,
-            "conversation": source_hex
+            "conversation": source_hex,
+            "sent_by_me": False,
         }
         
         update_message_db(interface, message_db)  # Update the database with the new message
@@ -93,15 +94,19 @@ def on_receive(packet, interface):
         message.ack_timestamp = datetime.fromtimestamp(time.time())
         update_message_db(interface, message.__dict__)  # Update message in database with new ACK status and timestamp
         # Push receipt update to frontend
-        receipt_msg = {
-            "type": "receipt",
-            "request_id": req_id,
-            "status": status,
-            "from": hex(packet.get("from")) if packet.get("from") is not None else None,
-            "timestamp": time.time(),
-            "reason": str(error_reason) if error_reason is not None else None,
-        }
-        print(f"Message {req_id} was {status} by {receipt_msg['from']} at {receipt_msg['timestamp']} (reason: {receipt_msg['reason']})")
+        publish_text_to_websocket(interface.app, {
+            "id": message.mes_id,
+            "source": hex(int.from_bytes(message.source_id, byteorder='big')),
+            "destination": hex(int.from_bytes(message.destination_id, byteorder='big')),
+            "text": message.text,
+            "timestamp": message.timestamp.timestamp(),
+            "rssi": message.rssi,
+            "channel": message.channel,
+            "conversation": message.conversation,
+            "sent_by_me": message.sent_by_me,
+            "ack_status": message.ack_status,
+            "ack_timestamp": message.ack_timestamp.timestamp() if message.ack_timestamp else None
+        }) 
 
 
 def get_meshtastic_port():

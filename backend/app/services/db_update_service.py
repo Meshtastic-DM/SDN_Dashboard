@@ -126,4 +126,18 @@ def get_messages_by_req_id_and_source(req_id, source_id):
         print(f"Error retrieving message: {e}")
         return None
     finally:
+        db.close()
+
+def get_messages_by_conversation(conversation):
+    """Function to retrieve messages from the database based on conversation ID"""
+    db = SessionLocal()
+    try:
+        messages = db.query(Message).filter(
+            Message.conversation == conversation
+        ).order_by(Message.timestamp).limit(1000).all()  # Limit to last 1000 messages for performance
+        return messages
+    except Exception as e:
+        print(f"Error retrieving messages by conversation: {e}")
+        return []
+    finally:
         db.close() 
