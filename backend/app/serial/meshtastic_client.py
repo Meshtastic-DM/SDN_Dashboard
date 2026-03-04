@@ -145,13 +145,36 @@ def send_text_message_client(interface, destination, text):
         print("⚠️  Cannot send message: Meshtastic interface not initialized.")
         return
     try:
-        sent= interface.sendText(text, destinationId=destination, wantAck=True)
+        # Convert destination from string format (!6c7438c8) to integer
+        if isinstance(destination, str):
+            destination_int = int(destination.strip('!'), 16)
+        else:
+            destination_int = destination
+            
+        sent= interface.sendText(text, destinationId=destination_int, wantAck=True)
         interface.app.state.pending[sent.id] = {
             "destination": destination,
             "text": text,
             "status": "pending",
             "timestamp": time.time()
         }
+        
+        # Convert IDs to bytes for database
+        source_bytes = interface.myInfo.my_node_num.to_bytes(4, byteorder='big')
+        destination_bytes = destination_int.to_bytes(4, byteorder='big')
+        
+        message = {
+            "id": sent.id,
+            "source": source_bytes,
+            "destination": destination_bytes,
+            "text": text,
+            "timestamp": datetime.fromtimestamp(time.time()),
+            "conversation": hex(destination_int),
+            "sent_by_me": True,
+            "ack_status": "pending",
+            "ack_timestamp": None
+        }
+        update_message_db(interface, message)  # Add sent message to database immediately
         print(f"✓ Sent message to {destination}: {text}")
     except Exception as e:
         print(f"⚠️  Error sending message: {e}")
