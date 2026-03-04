@@ -1,7 +1,7 @@
 import meshtastic
 import meshtastic.serial_interface
 from pubsub import pub
-from app.services.db_update_service import update_nodes_db,update_message_db
+from app.services.db_update_service import update_nodes_db,update_message_db, get_messages_by_req_id_and_source
 import asyncio
 import os
 import serial.tools.list_ports
@@ -68,25 +68,30 @@ def on_receive(packet, interface):
         update_nodes_db(interface)
 
     elif decoded.get("portnum") == "ROUTING_APP":
+        #print(f"Received routing packet: {packet}")
         routing = decoded.get("routing") or {}
 
         # This is the ID of the original packet being ACKed/NAKed
         req_id = decoded.get("requestId") or routing.get("request_id")
-        if req_id is None:
+        
+        # Convert source to bytes for database lookup
+        if interface and interface.myInfo:
+            source_int = interface.myInfo.my_node_num
+            source_bytes = source_int.to_bytes(4, byteorder='big')
+        else:
             return
-
+            
+        message = get_messages_by_req_id_and_source(req_id, source_bytes)  # Fetch message from database to update ACK status and timestamp
+        if message is None:
+            return
         # If present => NAK (delivery failed / no route / timeout etc.)
         error_reason = routing.get("errorReason") or routing.get("error_reason")
 
         status = "NAKED" if error_reason != "NONE" else "ACKED"
 
-        # Update your pending table if you keep one
-        if req_id in interface.app.state.pending:
-            interface.app.state.pending[req_id]["status"] = status
-            interface.app.state.pending[req_id]["ack_from"] = packet.get("from")
-            interface.app.state.pending[req_id]["reason"] = str(error_reason) if error_reason is not None else None
-            print(f"Updated pending message {req_id} status to {status}")
-
+        message.ack_status = status
+        message.ack_timestamp = datetime.fromtimestamp(time.time())
+        update_message_db(interface, message.__dict__)  # Update message in database with new ACK status and timestamp
         # Push receipt update to frontend
         receipt_msg = {
             "type": "receipt",

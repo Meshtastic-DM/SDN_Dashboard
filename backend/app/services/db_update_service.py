@@ -57,10 +57,14 @@ def update_message_db(iface, message):
     """Function to update the database with a new message"""
     db = SessionLocal()
     try:
+        # Get values first to avoid SQLAlchemy confusion with Python's 'or'
+        mes_id = message.get('id') or message.get('mes_id')
+        source_id = message.get('source') or message.get('source_id')
+        
         # Query with both primary keys
         existing_message = db.query(Message).filter(
-            Message.mes_id == message.get('id'),
-            Message.source_id == message.get('source')
+            Message.mes_id == mes_id,
+            Message.source_id == source_id
         ).first()
         
         if not existing_message:
@@ -78,22 +82,48 @@ def update_message_db(iface, message):
             ack_status = message.get('ack_status', 'pending'),
             ack_timestamp = message.get('ack_timestamp')
         )
+            db.add(new_message)
+            db.commit()
+            print(f"Added new message from {new_message.source_id} to {new_message.destination_id} at {new_message.timestamp}")
         else:
             # Update existing message (if needed)
-            existing_message.destination_id = message.get('destination') or message.get('destination_id')
-            existing_message.text = message.get('text')
-            existing_message.rssi = message.get('rssi')
-            existing_message.channel = message.get('channel')
-            existing_message.conversation = message.get('conversation')
-            existing_message.sent_by_me = message.get('sent_by_me')
-            existing_message.ack_status = message.get('ack_status')
-            existing_message.ack_timestamp = message.get('ack_timestamp')
-            print(f"Updated existing message from {existing_message.source_id} to {existing_message.destination_id} at {existing_message.timestamp}")
-        db.add(new_message)
-        db.commit()
-        print(f"Added new message from {new_message.source_id} to {new_message.destination_id} at {new_message.timestamp}")
+            # Only update non-None values to avoid overwriting existing data
+            if message.get('destination') or message.get('destination_id'):
+                existing_message.destination_id = message.get('destination') or message.get('destination_id')
+            if message.get('text') is not None:
+                existing_message.text = message.get('text')
+            if message.get('rssi') is not None:
+                existing_message.rssi = message.get('rssi')
+            if message.get('channel') is not None:
+                existing_message.channel = message.get('channel')
+            if message.get('conversation') is not None:
+                existing_message.conversation = message.get('conversation')
+            if message.get('sent_by_me') is not None:
+                existing_message.sent_by_me = message.get('sent_by_me')
+            if message.get('ack_status') is not None:
+                existing_message.ack_status = message.get('ack_status')
+            if message.get('ack_timestamp') is not None:
+                existing_message.ack_timestamp = message.get('ack_timestamp')
+            db.commit()
+            print(f"Updated existing message {existing_message.mes_id} with ack_status: {existing_message.ack_status}")
     except Exception as e:
         db.rollback()
         print(f"Error updating messages database: {e}")
+    finally:
+        db.close()
+
+
+def get_messages_by_req_id_and_source(req_id, source_id):
+    """Function to retrieve messages from the database based on request ID and source ID"""
+    db = SessionLocal()
+    try:
+        message = db.query(Message).filter(
+            Message.mes_id == req_id,
+            Message.source_id == source_id
+        ).first()
+        return message
+    except Exception as e:
+        print(f"Error retrieving message: {e}")
+        return None
     finally:
         db.close() 
