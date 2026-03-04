@@ -5,7 +5,7 @@ class Message(Base):
     __tablename__ = "messages"
 
     mes_id = Column(Integer, primary_key=True, index=True)
-    source_id = Column(LargeBinary(4))
+    source_id = Column(LargeBinary(4), primary_key=True)
     destination_id = Column(LargeBinary(4))
     text = Column(String)
     timestamp = Column(DateTime)
