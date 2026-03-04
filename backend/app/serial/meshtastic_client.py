@@ -34,6 +34,12 @@ def on_receive(packet, interface):
         channel = packet.get("channel")
         timestamp_now = time.time()
         
+        # Determine conversation ID: broadcast vs 1:1
+        if destination_hex == "0xffffffff":  # Broadcast message
+            conversation = destination_hex
+        else:
+            conversation = source_hex  # Use source as conversation ID for 1:1 messages
+        
         # Create a message dict for database (with bytes and datetime)
         message_db = {
             "source": source_bytes,
@@ -43,7 +49,7 @@ def on_receive(packet, interface):
             "rssi": rssi,
             "id": id,
             "channel": channel,
-            "conversation": source_hex,
+            "conversation": conversation,
             "sent_by_me": False
         }
         
@@ -56,7 +62,7 @@ def on_receive(packet, interface):
             "rssi": rssi,
             "id": id,
             "channel": channel,
-            "conversation": source_hex,
+            "conversation": conversation,
             "sent_by_me": False,
         }
         
