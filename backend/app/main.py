@@ -29,6 +29,7 @@ app = FastAPI()
 app.state.broadcaster = Broadcaster()
 app.state.text_message_broadcaster = Broadcaster()  # Separate broadcaster for DM updates if needed
 worker = None
+app.state.pending ={}
 
 app.add_middleware(
   CORSMiddleware,

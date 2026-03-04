@@ -7,7 +7,7 @@ def send_text_message(app, destination:str, text:str):
         raise ValueError("Meshtastic interface not initialized. Cannot send message.")
     try:
         # Send text message using the Meshtastic interface
-        send_text_message_client(interface, destination, text)
+        send_text_message_client(app,interface, destination, text)
     except Exception as e:
         print(f"Error sending text message: {e}")
         raise ValueError(f"Failed to send text message: {e}")

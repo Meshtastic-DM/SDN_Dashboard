@@ -25,6 +25,7 @@ def on_receive(packet, interface):
         destination = hex(packet.get("to"))
         text = decoded.get("text"),
         rssi = packet.get("rxRssi")
+        id = packet.get("id")
         # Create a message dict to send to the frontend
         message = {
             "source": source,
@@ -32,18 +33,52 @@ def on_receive(packet, interface):
             "text": text,
             "timestamp": packet.get("timestamp"),
             "rssi": rssi,
+            "id": id
         }
 
         # Publish the message to the frontend via WebSocket
         publish_text_to_websocket(interface.app, message)
     
-    if decoded.get("portnum") == "TELEMETRY_APP":
+    elif decoded.get("portnum") == "TELEMETRY_APP":
         #print(f"Received telemetry packet: {decoded}")
         update_nodes_db(interface)
+
+    elif decoded.get("portnum") == "ROUTING_APP":
+        routing = decoded.get("routing") or {}
+
+        # This is the ID of the original packet being ACKed/NAKed
+        req_id = decoded.get("requestId") or routing.get("request_id")
+        if req_id is None:
+            return
+
+        # If present => NAK (delivery failed / no route / timeout etc.)
+        error_reason = routing.get("errorReason") or routing.get("error_reason")
+
+        status = "NAKED" if error_reason != "NONE" else "ACKED"
+
+        # Update your pending table if you keep one
+        if req_id in interface.app.state.pending:
+            interface.app.state.pending[req_id]["status"] = status
+            interface.app.state.pending[req_id]["ack_from"] = packet.get("from")
+            interface.app.state.pending[req_id]["reason"] = str(error_reason) if error_reason is not None else None
+            print(f"Updated pending message {req_id} status to {status}")
+
+        # Push receipt update to frontend
+        receipt_msg = {
+            "type": "receipt",
+            "request_id": req_id,
+            "status": status,
+            "from": hex(packet.get("from")) if packet.get("from") is not None else None,
+            "timestamp": packet.get("timestamp"),
+            "reason": str(error_reason) if error_reason is not None else None,
+        }
+        print(f"Message {req_id} was {status} by {receipt_msg['from']} at {receipt_msg['timestamp']} (reason: {receipt_msg['reason']})")
+
 
 def get_meshtastic_port():
     ports: meshtastic.serial_interface.List[str] = meshtastic.util.findPorts(True)
     return ports
+
 
 def start_meshtastic_client(app, devPath=None):
     """Function to start the Meshtastic client and listen for packets"""
@@ -77,14 +112,24 @@ def start_meshtastic_client(app, devPath=None):
         print(f"⚠️  Error starting Meshtastic client: {e}")
         print(f"   Application will continue without Meshtastic integration.")
         raise ValueError(f"Meshtastic client failed to start: {e}")
-    
-def send_text_message_client(interface, destination, text):
+
+
+def on_ACK_NACK(p):
+    print(f"Received ACK/NACK: {p}")
+
+def send_text_message_client(app, interface, destination, text):
     """Function to send a text message via the Meshtastic interface"""
     if not interface:
         print("⚠️  Cannot send message: Meshtastic interface not initialized.")
         return
     try:
-        interface.sendText(text, destinationId=destination)
+        sent= interface.sendText(text, destinationId=destination, wantAck=True, onResponse=on_ACK_NACK)
+        app.state.pending[sent.id] = {
+            "destination": destination,
+            "text": text,
+            "status": "pending",
+            "timestamp": asyncio.get_event_loop().time()
+        }
         print(f"✓ Sent message to {destination}: {text}")
     except Exception as e:
         print(f"⚠️  Error sending message: {e}")
