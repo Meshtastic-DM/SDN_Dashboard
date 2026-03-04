@@ -1,3 +1,4 @@
+#TODO: This need to be deleted when the Meshtastic client is fully integrated and tested, as the client will handle parsing internally and emit structured events instead of raw lines. @Tharoosha
 import time
 import serial
 
@@ -16,6 +17,6 @@ def iter_fake_lines():
         # simulate changing values
         yield f"[SDN_ROUTE_UPDATE] seq_no={i} reporting_node={i} destination={i+2} next_hop={i+1} expiring_time=2024-06-01T12:00:00Z"
         i += 1
-        time.sleep(1)
+        time.sleep(10000)
         if i == 25:
             i = 0

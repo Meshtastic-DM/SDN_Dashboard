@@ -1,6 +1,6 @@
 from fastapi import APIRouter, WebSocket, Request
-from app.startup_functions.state import get_visible_entries, build_graph, reset_state
-from app.startup_functions.feed_simulator import start_simulated_feed
+from app.services.startup_functions.state import get_visible_entries, build_graph, reset_state
+from app.services.startup_functions.feed_simulator import start_simulated_feed
 from app.core.database import SessionLocal, get_db
 from app.models.route import Route
 from app.services.broadcaster import Broadcaster
