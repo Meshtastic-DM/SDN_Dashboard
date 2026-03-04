@@ -1,6 +1,7 @@
 
 from app.core.database import SessionLocal
 from app.models.node import Node
+from app.models.message import Message
 
 
 def update_nodes_db(iface):
@@ -49,5 +50,50 @@ def update_nodes_db(iface):
     except Exception as e:
         db.rollback()
         print(f"Error updating nodes database: {e}")
+    finally:
+        db.close()
+
+def update_message_db(iface, message):
+    """Function to update the database with a new message"""
+    db = SessionLocal()
+    try:
+        # Query with both primary keys
+        existing_message = db.query(Message).filter(
+            Message.mes_id == message.get('id'),
+            Message.source_id == message.get('source')
+        ).first()
+        
+        if not existing_message:
+            # Create new Message object and add to database
+            new_message = Message(
+            mes_id=int(message.get('id') or message.get('mes_id')),
+            source_id=message.get('source') or message.get('source_id'),
+            destination_id=message.get('destination') or message.get('destination_id'),
+            text=message.get('text'),
+            timestamp=message.get('timestamp'),
+            rssi=message.get('rssi'),
+            channel=message.get('channel'),
+            conversation=message.get('conversation'),
+            sent_by_me = message.get('sent_by_me', False),
+            ack_status = message.get('ack_status', 'pending'),
+            ack_timestamp = message.get('ack_timestamp')
+        )
+        else:
+            # Update existing message (if needed)
+            existing_message.destination_id = message.get('destination') or message.get('destination_id')
+            existing_message.text = message.get('text')
+            existing_message.rssi = message.get('rssi')
+            existing_message.channel = message.get('channel')
+            existing_message.conversation = message.get('conversation')
+            existing_message.sent_by_me = message.get('sent_by_me')
+            existing_message.ack_status = message.get('ack_status')
+            existing_message.ack_timestamp = message.get('ack_timestamp')
+            print(f"Updated existing message from {existing_message.source_id} to {existing_message.destination_id} at {existing_message.timestamp}")
+        db.add(new_message)
+        db.commit()
+        print(f"Added new message from {new_message.source_id} to {new_message.destination_id} at {new_message.timestamp}")
+    except Exception as e:
+        db.rollback()
+        print(f"Error updating messages database: {e}")
     finally:
         db.close() 

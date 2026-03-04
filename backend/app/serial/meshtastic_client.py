@@ -1,11 +1,12 @@
 import meshtastic
 import meshtastic.serial_interface
 from pubsub import pub
-from app.services.node_service import update_nodes_db
+from app.services.db_update_service import update_nodes_db,update_message_db
 import asyncio
 import os
 import serial.tools.list_ports
 import time
+from datetime import datetime
 
 def publish_text_to_websocket(app, message:dict):
     """Utility function to publish text message updates to the frontend via WebSocket"""
@@ -22,25 +23,45 @@ def on_receive(packet, interface):
         return  # Ignore packets that can't be decoded
     decoded = packet["decoded"]
     if decoded.get("portnum") == "TEXT_MESSAGE_APP":
-        source = hex(packet.get("from"))
-        destination = hex(packet.get("to"))
-        text = decoded.get("text"),
+        source_hex = hex(packet.get("from"))
+        destination_hex = hex(packet.get("to"))
+        # Convert hex to bytes for database (strip '0x' prefix)
+        source_bytes = bytes.fromhex(source_hex[2:])
+        destination_bytes = bytes.fromhex(destination_hex[2:])
+        text = decoded.get("text")  # Remove trailing comma - it was creating a tuple!
         rssi = packet.get("rxRssi")
         id = packet.get("id")
         channel = packet.get("channel")
-        # Create a message dict to send to the frontend
-        message = {
-            "source": source,
-            "destination": destination,
+        timestamp_now = time.time()
+        
+        # Create a message dict for database (with bytes and datetime)
+        message_db = {
+            "source": source_bytes,
+            "destination": destination_bytes,
             "text": text,
-            "timestamp": time.time(),
+            "timestamp": datetime.fromtimestamp(timestamp_now),
             "rssi": rssi,
             "id": id,
-            "channel": channel
+            "channel": channel,
+            "conversation": source_hex,
+            "sent_by_me": False
         }
-
+        
+        # Create a message dict for WebSocket (with hex strings and float timestamp)
+        message_ws = {
+            "source": source_hex,
+            "destination": destination_hex,
+            "text": text,
+            "timestamp": timestamp_now,
+            "rssi": rssi,
+            "id": id,
+            "channel": channel,
+            "conversation": source_hex
+        }
+        
+        update_message_db(interface, message_db)  # Update the database with the new message
         # Publish the message to the frontend via WebSocket
-        publish_text_to_websocket(interface.app, message)
+        publish_text_to_websocket(interface.app, message_ws)
     
     elif decoded.get("portnum") == "TELEMETRY_APP":
         #print(f"Received telemetry packet: {decoded}")
@@ -135,3 +156,4 @@ def send_text_message_client(interface, destination, text):
     except Exception as e:
         print(f"⚠️  Error sending message: {e}")
         raise ValueError(f"Failed to send text message: {e}")
+    
