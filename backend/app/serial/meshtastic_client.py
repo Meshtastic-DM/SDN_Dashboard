@@ -186,6 +186,7 @@ def send_text_message_client(interface, destination, text):
         }
         update_message_db(interface, message)  # Add sent message to database immediately
         print(f"✓ Sent message to {destination}: {text}")
+        return sent.id
     except Exception as e:
         print(f"⚠️  Error sending message: {e}")
         raise ValueError(f"Failed to send text message: {e}")

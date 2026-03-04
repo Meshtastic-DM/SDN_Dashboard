@@ -21,8 +21,8 @@ async def ws_texts(ws: WebSocket):
 async def send_text(request: Request, destination: str, text: str):
     """API endpoint to send a text message via the Meshtastic interface"""
     try:
-        send_text_message(request.app, destination, text)
-        return {"status": "success", "message": f"Text message sent to {destination}"}
+        mes_id = send_text_message(request.app, destination, text)
+        return {"status": "success", "message": f"Text message sent to {destination}", "mes_id": mes_id}
     except Exception as e:
         print(f"Error in send_text endpoint: {e}")
         raise HTTPException(status_code=500, detail=str(e))
