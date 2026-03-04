@@ -5,6 +5,7 @@ from app.services.node_service import update_nodes_db
 import asyncio
 import os
 import serial.tools.list_ports
+import time
 
 def publish_text_to_websocket(app, message:dict):
     """Utility function to publish text message updates to the frontend via WebSocket"""
@@ -26,14 +27,16 @@ def on_receive(packet, interface):
         text = decoded.get("text"),
         rssi = packet.get("rxRssi")
         id = packet.get("id")
+        channel = packet.get("channel")
         # Create a message dict to send to the frontend
         message = {
             "source": source,
             "destination": destination,
             "text": text,
-            "timestamp": packet.get("timestamp"),
+            "timestamp": time.time(),
             "rssi": rssi,
-            "id": id
+            "id": id,
+            "channel": channel
         }
 
         # Publish the message to the frontend via WebSocket
@@ -69,7 +72,7 @@ def on_receive(packet, interface):
             "request_id": req_id,
             "status": status,
             "from": hex(packet.get("from")) if packet.get("from") is not None else None,
-            "timestamp": packet.get("timestamp"),
+            "timestamp": time.time(),
             "reason": str(error_reason) if error_reason is not None else None,
         }
         print(f"Message {req_id} was {status} by {receipt_msg['from']} at {receipt_msg['timestamp']} (reason: {receipt_msg['reason']})")
@@ -114,21 +117,19 @@ def start_meshtastic_client(app, devPath=None):
         raise ValueError(f"Meshtastic client failed to start: {e}")
 
 
-def on_ACK_NACK(p):
-    print(f"Received ACK/NACK: {p}")
 
-def send_text_message_client(app, interface, destination, text):
+def send_text_message_client(interface, destination, text):
     """Function to send a text message via the Meshtastic interface"""
     if not interface:
         print("⚠️  Cannot send message: Meshtastic interface not initialized.")
         return
     try:
-        sent= interface.sendText(text, destinationId=destination, wantAck=True, onResponse=on_ACK_NACK)
-        app.state.pending[sent.id] = {
+        sent= interface.sendText(text, destinationId=destination, wantAck=True)
+        interface.app.state.pending[sent.id] = {
             "destination": destination,
             "text": text,
             "status": "pending",
-            "timestamp": asyncio.get_event_loop().time()
+            "timestamp": time.time()
         }
         print(f"✓ Sent message to {destination}: {text}")
     except Exception as e:
