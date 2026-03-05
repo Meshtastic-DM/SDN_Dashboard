@@ -7,6 +7,8 @@ import os
 import serial.tools.list_ports
 import time
 from datetime import datetime
+# Protobuf imports for SDN and AODV packet parsing
+from app.generated import sdn_pb2, aodv_pb2, portnums_pb2
 
 def publish_text_to_websocket(app, message:dict):
     """Utility function to publish text message updates to the frontend via WebSocket"""
@@ -22,7 +24,107 @@ def on_receive(packet, interface):
     if packet.get("decoded") is None:
         return  # Ignore packets that can't be decoded
     decoded = packet["decoded"]
-    if decoded.get("portnum") == "TEXT_MESSAGE_APP":
+    portnum = decoded.get('portnum', 'Unknown')
+    
+    # Use portnums_pb2 for robust port number matching
+    try:
+        portnum_val = int(portnum) if isinstance(portnum, int) else getattr(portnums_pb2.PortNum, str(portnum), None)
+    except Exception:
+        portnum_val = None
+    
+    # SDN packets
+    if portnum_val == portnums_pb2.PortNum.SDN_APP:
+        print(f"🌐 SDN PACKET:")
+        payload = decoded.get('payload', b'')
+        try:
+            sdn_msg = sdn_pb2.SDN()
+            sdn_msg.ParseFromString(payload)
+            # Display SDN message type
+            if sdn_msg.HasField("announcement"):
+                print("  Type: SDN Announcement")
+                print(f"  Reporter: {hex(packet.get('from'))}")
+                ann = sdn_msg.announcement
+                print(f"  HMAC Hash: {ann.hmac_hash.hex() if ann.hmac_hash else 'N/A'}")
+                print(f"  Public Key: {ann.public_key.hex() if ann.public_key else 'N/A'}")
+                print(f"  Sequence Num: {ann.sequence_num}")
+                print(f"  Timestamp: {ann.timestamp}")
+            elif sdn_msg.HasField("route_update"):
+                print("  Type: Route Update")
+                print(f"  Reporter: {hex(packet.get('from'))}")
+                ru = sdn_msg.route_update
+                print(f"  Destination: {hex(ru.destination)}")
+                print(f"  Next Hop: {hex(ru.next_hop)}")
+                print(f"  Hop Count: {ru.hop_count}")
+                print(f"  Dest Seq Num: {ru.dest_seq_num}")
+                print(f"  Timestamp: {ru.timestamp}")
+            elif sdn_msg.HasField("route_command"):
+                print("  Type: Route Command")
+                print(f"  Reporter: {hex(packet.get('from'))}")
+                rc = sdn_msg.route_command
+                print(f"  Destination: {hex(rc.destination)}")
+                print(f"  Next Hop: {hex(rc.next_hop)}")
+            elif sdn_msg.HasField("route_install"):
+                print("  Type: Route Install")
+                print(f"  Reporter: {hex(packet.get('from'))}")
+                ri = sdn_msg.route_install
+                print(f"  Destination: {hex(ri.destination)}")
+                print(f"  Hop Path: {hex(ri.hop_path)}")
+                print(f"  Install ID: {ri.install_id}")
+            elif sdn_msg.HasField("route_set"):
+                print("  Type: Route Set")
+                print(f"  Reporter: {hex(packet.get('from'))}")
+                rs = sdn_msg.route_set
+                print(f"  Destination: {hex(rs.destination)}")
+                print(f"  Hop Path: {hex(rs.hop_path)}")
+                print(f"  Install ID: {rs.install_id}")
+            elif sdn_msg.HasField("route_set_confirm"):
+                print("  Type: Route Set Confirm")
+                print(f"  Reporter: {hex(packet.get('from'))}")
+                rsc = sdn_msg.route_set_confirm
+                print(f"  Destination: {hex(rsc.destination)}")
+                print(f"  Install ID: {rsc.install_id}")
+                print(f"  Success: {rsc.success}")
+                print(f"  Error Message: {rsc.error_msg if rsc.error_msg else 'N/A'}")
+            elif sdn_msg.HasField("link_quality"):
+                print("  Type: Link Quality Report")
+                print(f"  Reporter: {hex(packet.get('from'))}")
+                lq = sdn_msg.link_quality
+                print(f"  Relay Nodes: {[hex(n) for n in lq.relay_node]}")
+                print(f"  RX Good: {list(lq.rx_good)}")
+                print(f"  RX Bad: {list(lq.rx_bad)}")
+                print(f"  Channel Util: {getattr(lq, 'channel_utilization', 'N/A')}")
+                print(f"  Air Util TX: {getattr(lq, 'air_util_tx', 'N/A')}")
+            else:
+                print("  Type: Unknown SDN message")
+                print(f"  SDN Raw: {sdn_msg}")
+        except Exception as e:
+            print(f"  (SDN Parse error: {e})")
+            print(f"  Raw payload length: {len(payload)} bytes")
+    
+    # AODV packets
+    elif portnum_val == portnums_pb2.PortNum.AODV_ROUTING_APP:
+        print(f"🗺️  AODV PACKET:")
+        payload = decoded.get('payload', b'')
+        try:
+            aodv_msg = aodv_pb2.AODV()
+            aodv_msg.ParseFromString(payload)
+            if aodv_msg.HasField("rreq"):
+                print("  Type: Route Request (RREQ)")
+                print(f"  RREQ: {aodv_msg.rreq}")
+            elif aodv_msg.HasField("rrep"):
+                print("  Type: Route Reply (RREP)")
+                print(f"  RREP: {aodv_msg.rrep}")
+            elif aodv_msg.HasField("rerr"):
+                print("  Type: Route Error (RERR)")
+                print(f"  RERR: {aodv_msg.rerr}")
+            else:
+                print("  Type: Unknown AODV message")
+                print(f"  AODV Raw: {aodv_msg}")
+        except Exception as e:
+            print(f"  (AODV Parse error: {e})")
+            print(f"  Raw payload length: {len(payload)} bytes")
+    
+    elif decoded.get("portnum") == "TEXT_MESSAGE_APP":
         source_hex = hex(packet.get("from"))
         destination_hex = hex(packet.get("to"))
         # Convert hex to bytes for database (strip '0x' prefix)
