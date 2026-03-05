@@ -7,6 +7,8 @@ import os
 import serial.tools.list_ports
 import time
 from datetime import datetime
+# Protobuf imports for SDN and AODV packet parsing
+from app.generated import sdn_pb2, aodv_pb2, portnums_pb2
 
 def publish_text_to_websocket(app, message:dict):
     """Utility function to publish text message updates to the frontend via WebSocket"""
@@ -22,7 +24,79 @@ def on_receive(packet, interface):
     if packet.get("decoded") is None:
         return  # Ignore packets that can't be decoded
     decoded = packet["decoded"]
-    if decoded.get("portnum") == "TEXT_MESSAGE_APP":
+    portnum = decoded.get('portnum', 'Unknown')
+    
+    # Use portnums_pb2 for robust port number matching
+    try:
+        portnum_val = int(portnum) if isinstance(portnum, int) else getattr(portnums_pb2.PortNum, str(portnum), None)
+    except Exception:
+        portnum_val = None
+    
+    # SDN packets
+    if portnum_val == portnums_pb2.PortNum.SDN_APP:
+        print(f"🌐 SDN PACKET:")
+        payload = decoded.get('payload', b'')
+        try:
+            sdn_msg = sdn_pb2.SDN()
+            sdn_msg.ParseFromString(payload)
+            # Display SDN message type
+            if sdn_msg.HasField("announcement"):
+                print("  Type: SDN Announcement")
+                print(f"  Announcement: {sdn_msg.announcement}")
+            elif sdn_msg.HasField("route_update"):
+                print("  Type: Route Update")
+                print(f"  RouteUpdate: {sdn_msg.route_update}")
+            elif sdn_msg.HasField("route_command"):
+                print("  Type: Route Command")
+                print(f"  RouteCommand: {sdn_msg.route_command}")
+            elif sdn_msg.HasField("route_install"):
+                print("  Type: Route Install")
+                print(f"  RouteInstall: {sdn_msg.route_install}")
+            elif sdn_msg.HasField("route_set"):
+                print("  Type: Route Set")
+                print(f"  RouteSet: {sdn_msg.route_set}")
+            elif sdn_msg.HasField("route_set_confirm"):
+                print("  Type: Route Set Confirm")
+                print(f"  RouteSetConfirm: {sdn_msg.route_set_confirm}")
+            elif sdn_msg.HasField("link_quality"):
+                print("  Type: Link Quality Report")
+                lq = sdn_msg.link_quality
+                print(f"  Relay Nodes: {[hex(n) for n in lq.relay_node]}")
+                print(f"  RX Good: {list(lq.rx_good)}")
+                print(f"  RX Bad: {list(lq.rx_bad)}")
+                print(f"  Channel Util: {getattr(lq, 'channel_utilization', 'N/A')}")
+                print(f"  Air Util TX: {getattr(lq, 'air_util_tx', 'N/A')}")
+            else:
+                print("  Type: Unknown SDN message")
+                print(f"  SDN Raw: {sdn_msg}")
+        except Exception as e:
+            print(f"  (SDN Parse error: {e})")
+            print(f"  Raw payload length: {len(payload)} bytes")
+    
+    # AODV packets
+    elif portnum_val == portnums_pb2.PortNum.AODV_ROUTING_APP:
+        print(f"🗺️  AODV PACKET:")
+        payload = decoded.get('payload', b'')
+        try:
+            aodv_msg = aodv_pb2.AODV()
+            aodv_msg.ParseFromString(payload)
+            if aodv_msg.HasField("rreq"):
+                print("  Type: Route Request (RREQ)")
+                print(f"  RREQ: {aodv_msg.rreq}")
+            elif aodv_msg.HasField("rrep"):
+                print("  Type: Route Reply (RREP)")
+                print(f"  RREP: {aodv_msg.rrep}")
+            elif aodv_msg.HasField("rerr"):
+                print("  Type: Route Error (RERR)")
+                print(f"  RERR: {aodv_msg.rerr}")
+            else:
+                print("  Type: Unknown AODV message")
+                print(f"  AODV Raw: {aodv_msg}")
+        except Exception as e:
+            print(f"  (AODV Parse error: {e})")
+            print(f"  Raw payload length: {len(payload)} bytes")
+    
+    elif decoded.get("portnum") == "TEXT_MESSAGE_APP":
         source_hex = hex(packet.get("from"))
         destination_hex = hex(packet.get("to"))
         # Convert hex to bytes for database (strip '0x' prefix)
