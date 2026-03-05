@@ -7,6 +7,7 @@ import os
 import serial.tools.list_ports
 import time
 from datetime import datetime
+from app.services.sdn_packet_handler import handle_SDN_route_update
 # Protobuf imports for SDN and AODV packet parsing
 from app.generated import sdn_pb2, aodv_pb2, portnums_pb2
 
@@ -57,11 +58,18 @@ def on_receive(packet, interface):
                 print("  Type: Route Update")
                 print(f"  Reporter: {hex(packet.get('from'))}")
                 ru = sdn_msg.route_update
-                print(f"  Destination: {hex(ru.destination)}")
-                print(f"  Next Hop: {hex(ru.next_hop)}")
-                print(f"  Hop Count: {ru.hop_count}")
-                print(f"  Dest Seq Num: {ru.dest_seq_num}")
-                print(f"  Timestamp: {ru.timestamp}")
+                source = hex(packet.get('from'))
+                destination = hex(ru.destination)
+                next_hop = hex(ru.next_hop)
+                hop_count = ru.hop_count
+                timestamp = ru.timestamp
+                dest_seq_num = ru.dest_seq_num
+                # print(f"  Destination: {hex(ru.destination)}")
+                # print(f"  Next Hop: {hex(ru.next_hop)}")
+                # print(f"  Hop Count: {ru.hop_count}")
+                # print(f"  Dest Seq Num: {ru.dest_seq_num}")
+                # print(f"  Timestamp: {ru.timestamp}")
+                handle_SDN_route_update(source, destination, hop_count, next_hop, timestamp, dest_seq_num, interface.app)
             elif sdn_msg.HasField("route_command"):
                 print("  Type: Route Command")
                 print(f"  Reporter: {hex(packet.get('from'))}")
