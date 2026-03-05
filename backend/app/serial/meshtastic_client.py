@@ -16,6 +16,11 @@ def publish_text_to_websocket(app, message:dict):
     broadcaster.publish(message)
     print(f"Published text message to WebSocket: {message}")
 
+def publish_node_update_to_websocket(app, node_info:dict):
+    """Utility function to publish node updates to the frontend via WebSocket"""
+    broadcaster = app.state.node_update_broadcaster  # Use separate broadcaster for node updates
+    broadcaster.publish(node_info)
+    print(f"Published node update to WebSocket: {node_info}")
 
 def on_receive(packet, interface):
     """Callback function to handle incoming Meshtastic packets"""
@@ -174,7 +179,11 @@ def on_receive(packet, interface):
     
     elif decoded.get("portnum") == "TELEMETRY_APP":
         #print(f"Received telemetry packet: {decoded}")
-        update_nodes_db(interface)
+        changed_nodes = update_nodes_db(interface)
+        if (len(changed_nodes) > 0):
+            for node in changed_nodes:
+                publish_node_update_to_websocket(interface.app, node)
+            
 
     elif decoded.get("portnum") == "ROUTING_APP":
         #print(f"Received routing packet: {packet}")
